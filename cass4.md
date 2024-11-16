@@ -1,4 +1,4 @@
-## 架构
+## 集群架构
 
 Cassandra常用在**地理位置分散**的系统中。
 
@@ -8,7 +8,7 @@ Cassandra提供了两层分组来描述一个集群的拓扑：**数据中心（
 
 ## Gossip
 
-Gossip是一种点对点（peer-to-peer）通信协议。Cassandra利用Gossip协议跟踪集群中所有节点的状态信息，以此来实现故障检测。
+Gossip是一种点对点（peer-to-peer）通信协议。Cassandra利用Gossip协议跟踪集群中所有**节点的状态信息**，以此来实现故障检测。
 
 节点间通过Gossip协议周期性地交换信息，交换的信息既包括节点**自己的状态信息**，也包括它所了解到的**其它节点的状态信息**。
 
@@ -44,7 +44,7 @@ snitch（告密者）的任务是提供网络拓扑的有关信息，使Cassandr
 
 A snitch determines which datacenters and racks nodes belong to. They inform Cassandra about the network topology so that requests are routed efficiently and allows Cassandra to distribute replicas by grouping machines into datacenters and racks.
 
-The replication strategy places the replicas based on the information provided by the new snitch.
+The **replication strategy** places the replicas **based on the information provided by the snitch**.
 
 Cassandra执行一个读操作时，必须满足一致性级别要求的副本数。为了提高读取速度，Cassandra会选择一个节点查询完整的数据，并向其它节点请求数据的Hash值来实现数据的对比。snitch在这里的作用就是帮助识别能最快返回数据的节点，从而向那个节点查询完整的数据。
 
@@ -100,7 +100,7 @@ Cassandra采用的就是`一致性哈希算法`，[一致性哈希算法的介�
 
 Consistent hashing allows distribution of data across a cluster to minimize reorganization when nodes are added or removed.
 
-Each node in the cluster is responsible for a range of data based on the hash value.
+Each node in the cluster is responsible for **a range of data** based on the hash value.
 
 ![arc_hashValueRange](.\image\arc_hashValueRange.png)
 
@@ -112,7 +112,7 @@ Prior to Cassandra 1.2, you had to calculate and assign a single token to each n
 
 一个token就对应环上的一段数据区间，Cassandra 1.2中的一个节点只能被分配一个token，所以一个节点只能管理环上的一段数据区间。
 
-In Cassandra 1.2 and later, each node is allowed **many** tokens. The new paradigm is called virtual nodes (vnodes). Vnodes allow each node to own a large number of small partition ranges distributed throughout the cluster.
+In Cassandra 1.2 and later, each node is allowed **many** tokens. The new paradigm is called virtual nodes (vnodes). Vnodes allow each node to own **a large number of small partition ranges** distributed throughout the cluster.
 
 ##### Ring without virtual nodes
 
@@ -140,8 +140,8 @@ a partitioner is a function for deriving a token representing a row from its par
 
 Cassandra offers the following partitioners：
 
-- `Murmur3Partitioner` (default): uniformly distributes data across the cluster based on MurmurHash hash values.
-- `RandomPartitioner`: uniformly distributes data across the cluster based on MD5 hash values.
+- `Murmur3Partitioner` (default): uniformly distributes data across the cluster based on **MurmurHash** hash values.
+- `RandomPartitioner`: uniformly distributes data across the cluster based on **MD5** hash values.
 - `ByteOrderedPartitioner`: keeps an ordered distribution of data lexically by key bytes
 
 The `RandomPartitioner` uses a cryptographic hash that takes longer to generate than the `Murmur3Partitioner`. Cassandra doesn't really need a cryptographic hash, so using the `Murmur3Partitioner` results in a 3-5 times improvement in performance.
@@ -150,7 +150,7 @@ Partitioner使用的Hash算法不需要有加密特性。
 
 ### 复制策略
 
-Cassandra stores replicas on multiple nodes to ensure reliability and fault tolerance. The total number of replicas across the cluster is referred to as the replication factor.
+Cassandra stores replicas on multiple nodes to ensure reliability and fault tolerance. The total number of replicas across the cluster is referred to as the **replication factor**.
 
 A replication factor of 1 means that there is only one copy of each row in the cluster. If the node containing the row goes down, the row cannot be retrieved. 
 
@@ -166,11 +166,11 @@ The replication factor should not exceed the number of nodes in the cluster.
 
 Cassandra直接提供了两种复制策略：`SimpleStrategy`和`NetworkTopologyStrategy`。
 
-SimpleStrategy 从 Partitioner 指定的节点开始，将每个replica放置到环中连续的节点上。
+SimpleStrategy 从 Partitioner 指定的节点开始，将每个replica放置到环中**连续**的节点上。
 
 NetworkTopologyStrategy允许你为每个datacenter指定一个不同的副本因子。在一个datacenter中，Cassandra会适当地**将各个replica放置到不同的rack**上以获得最大的availability。对于在production环境的部署，都推荐使用NetworkTopologyStrategy，因为如果需要，使用这个策略可以更容易地增加额外的datacenter。
 
-每个 keyspace 的复制策略时单独设置的。
+每个 keyspace 的复制策略是单独设置的。
 
 ##### SimpleStrategy
 
@@ -180,9 +180,9 @@ Use only for a single datacenter and one rack. `SimpleStrategy` places the first
 
 Use `NetworkTopologyStrategy` when you have (or plan to have) your cluster deployed across multiple datacenters. This strategy specifies how many replicas you want in each datacenter.
 
-`NetworkTopologyStrategy` places replicas in the same datacenter by walking the ring clockwise until reaching the first node in another rack. `NetworkTopologyStrategy` attempts to place replicas on distinct racks because nodes in the same rack often fail at the same time due to power, cooling, or network issues.
+`NetworkTopologyStrategy` places replicas in the same datacenter by walking the ring clockwise until reaching the first node in **another rack**. `NetworkTopologyStrategy` attempts to place replicas **on distinct racks** because nodes in the same rack often fail at the same time due to power, cooling, or network issues.
 
-##### how many replicas to configure in each datacenter
+##### How many replicas to configure in each datacenter
 
 When deciding how many replicas to configure in each datacenter, the two primary considerations are (1) being able to satisfy reads locally, without incurring cross data-center latency, and (2) failure scenarios.
 
@@ -201,15 +201,13 @@ The two most common ways to configure multiple datacenter clusters are:
 
 一致性级别ALL要求所有节点都响应。
 
-在Cassandra中，一致性是可调的，客户可以对读写操作分别指定所需的一致性级别。
+在Cassandra中，一致性是可调的，客户端可以对读写操作分别指定所需的一致性级别。
 
-**R + W > RF = 强一致性**。只要满足这个条件，所有读操作都会看到最新些操作的结果。
+**R + W > RF = 强一致性**。只要满足这个条件，所有读操作就都会看到最新写操作的结果，因此可以得到强一致性。
 
+不要搞混副本因子和一致性级别的概念。副本因子是为每个keyspace设置的，一致性级别则是客户端为每个查询指定的。
 
-
-
-
-# 
+一致性级别是基于副本因子，而不是基于集群中的节点数。
 
 ## Repairing nodes
 
@@ -230,6 +228,9 @@ Cassandra provides the following repair processes:
 - [Anti-Entropy Repair](https://docs.datastax.com/en/cassandra-oss/3.x/cassandra/operations/opsRepairNodesManualRepair.html)
 
   Cassandra provides the [nodetool repair](https://docs.datastax.com/en/cassandra-oss/3.x/cassandra/tools/toolsRepair.html) tool, which you can use to repair recovering nodes.
+  也叫做手动修复（**manual repair**），作为日常维护过程的一部分。它会先执行校验操作，再执行合并操作。
+
+  Cassandra通过Merkle Tree实现校验，一个节点会与其相邻节点交换Merkle Tree，如果不同节点的Merkle Tree不匹配，就会执行修复操作。
 
 
 
