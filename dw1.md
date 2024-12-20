@@ -478,5 +478,209 @@ select id, info.name, info.age from test_struct;
 
 <img src="./image2/image-20241210221019818.png" alt="image-20241210221019818" style="zoom:50%;" />
 
+## 文件存储格式
+
+Hive提供的文件存储格式包括：TextFile、SequenceFile、ORC (Optimized Row Columnar)、Parquet等。
+
+文件格式在建表的时候指定，默认是TextFile。可以通过`STORED AS`对文件格式进行设置。
+
+### TextFile
+
+TextFile是Hive中默认的文件格式，按**行**存储数据。
+
+几乎所有的原始数据生成都是纯文本格式，所以Hive为了避免各种编码及数据错乱的问题，选用了TextFile作为默认的格式。
+
+TextFile的缺点如下：
+
+1. 耗费存储空间。
+2. 按行存储，读取列的性能差。
+
+TextFile一般用于做`ODS`层数据加载。通过load命令直接将数据加载到表中。
+
+```hive
+create table tb_sogou_source
+(
+    stime      string,
+    userid     string,
+    keyword    string,
+    clickorder string,
+    url        string
+) row format delimited fields terminated by '\t';
+
+load data inpath '/test_hive/SogouQ.reduced' into table tb_sogou_source;
+```
+
+查询`tb_sogou_source`如下所示：
+
+![image-20241211224904924](./image2/image-20241211224904924.png)
+
+### SequenceFile
+
+SequenceFile是Hadoop里用来存储序列化的**键值对**即**二进制**的一种文件格式。SequenceFile文件也可以作为MapReduce作业的输入和输出，hive也支持这种格式。
+
+优点：
+
+1. 以二进制的KV形式存储数据与底层交互更加友好，性能更快可压缩、可分割。
+2. 优化磁盘利用率和I/O可并行操作数据，查询效率高。
+
+缺点：
+
+1. 存储空间消耗最大
+2. 与非Hadoop生态系统之外的工具不兼容
+
+```hive
+create table tb_sogou_seq
+(
+    stime      string,
+    userid     string,
+    keyword    string,
+    clickorder string,
+    url        string
+) row format delimited fields terminated by '\t'
+stored as sequencefile;
+
+insert into table tb_sogou_seq 
+select * from tb_sogou_source;
+```
+
+### Parquet
+
+Parquet是一种支持**嵌套结构**的**列式存储**文件格式。
+
+适用于字段数非常多，无更新，只取部分列的查询。
+
+优点：
+
+1. 高效的数据编码和压缩。可压缩、可分割。
+2. 优化磁盘利用率和I/O。
+3. 可用于多种数据处理框架。
+
+缺点：
+
+不支持update, insert, delete
+
+```hive
+create table tb_sogou_parquet
+(
+    stime      string,
+    userid     string,
+    keyword    string,
+    clickorder string,
+    url        string
+) row format delimited fields terminated by '\t'
+stored as parquet;
+
+insert into table tb_sogou_parquet select * from tb_sogou_source;
+```
+
+### ORC
+
+ORC（OptimizedRC File）也是一种**列式存储**文件格式。
+
+ORC最初就**产生自Apache Hive**，用于降低Hadoop数据存储空间和加速Hive查询速度。
+
+ORC适用于Hive中大型的存储、查询。
+
+优点：
+
+1. 列式存储。
+2. 存储效率非常高。
+3. 可压缩。
+4. 支持索引，支持矢量化查询。
+
+缺点：
+
+1. 加载时性能消耗较大。
+2. 需要通过text文件转化生成。
+3. 读取全量数据时性能较差。
+
+```hive
+create table tb_sogou_orc
+(
+    stime      string,
+    userid     string,
+    keyword    string,
+    clickorder string,
+    url        string
+) row format delimited fields terminated by '\t'
+stored as orc;
+
+insert into table tb_sogou_orc select * from tb_sogou_source;
+```
+ORC格式的压缩比非常高，同样的数据，ORC格式只有32.65MB，而其它三种格式都在140MB以上。
+其中占用空间最大的是SequenceFile格式，占用173.33MB的空间。一般规定Hive使用ORC存储格式。
+
+
+# Hive部署
+1. 先安装Mysql
+2. 修改hive中的配置文件，要告诉hive HADOOP_HOME和mysql地址等信息。
+3. 将mysql的驱动jar放入lib文件夹内。
+4. 执行如下命令初始化mysql，这个命令会在mysql中创建所有跟元数据相关的表。
+    ```shell
+    ./schematool -initSchema -dbType mysql -verbos
+    ```
+5. 启动metastore服务,执行如下命令：
+   ```shell
+   nohup ./bin/hive --service metastore >> logs/metastore.log 2>&1 &
+   ```
+6. 执行命令`./bin/hive`启动hive shell，此时就可以通过hive shell操作hive数据库了。但其它客户端工具还无法远程连接的hive。
+7. 要想让其它客户端工具远程连接到hive，需要启动hiveserver2，这是一个ThriftServer。启动命令如下：
+    ```shell
+    nohup ./bin/hive --service hiveserver2 >> logs/hiveserver2.log 2>&1 &
+    ```
+
+# HDFS中的三个角色
+NameNode, DataNode, SecondaryNameNode
+
+`start-dfs.sh` 一键启动hdfs集群
+
+`stop-dfs.sh` 一键关闭hdfs集群
+
+hdfs系统的管理网页： `http://node1:9870`
+
+## SecondaryNameNode
+NameNode基于多个edits和一个fsimage文件的配合完成整个文件系统元数据的管理和维护。
+
+edits文件是一个流水账文件，记录了hdfs中的每一次操作，以及每次操作影响的文件及其对应的block。
+
+当一个edits文件中的数据到达一定量时，数据就会被记录到另一个新的edits文件中。所以在某一个时刻可能会存在多个edits文件。
+
+当用户要查找某个文件时，NameNode需要遍历所有的edits文件以确定要查找文件的最终状态。如果edits文件数量非常多，这势必会影响文件的查询效率。**所以需要合并edits文件， 将多个对相同文件的操作合并，只保留文件的最终状态**。
+
+将多个edits文件合并后，得到的文件系统最终的描述文件就是**fsimage**文件。
+<img src="./image2/fs_image.png" alt="image-20241210220627876" style="zoom:50%;" />
+
+NameNode基于edits和FSImage的配合，完成整个文件系统元数据的管理。
+1. 每次对HDFS的操作，均被edits文件记录
+2. edits文件达到大小上限后，开启新的edits文件记录后续对HDFS的操作。
+3. 定期进行edits文件的合并操作。如当前没有fsimage文件，将全部edits文件合并为第一个fsimage。如果当前已存在fsimage文件，将全部edits和已存在的fsimage进行合并，形成新的fsimage。
+
+
+对于元数据的合并，是一个定时过程，它基于如下三个配置：
+1. `dfs.namenode.checkpoint.period`, 默认3600秒，即一小时合并一次。
+2. `dfs.namenode.checkpoint.txns`, 默认1000000，即100W次事务合并一次。这两个条件哪个先满足都会触发merge。
+3. `dfs.namenode.checkpoint.check.period` 检查是否到达merge的条件，默认60秒。
+
+
+SecondaryNameNode的职责就是执行元数据的合并：
+
+<img src="./image2/merge.png" alt="image-20241210220627876" style="zoom:50%;" />
+
+SecondaryNameNode会通过http从NameNode拉取数据，包括edits和fsimage。合并完成后再返回给NameNode使用。
+
+
+# YARN
+YARN中出了ResourceManager和NodeManager以外，还有ProxyServer和JobHistoryServer两个组件。
+
+JobHistoryServer 记录历史运行的程序的信息以及产生的日志并提供WEB UI站点供用户使用浏览器查看。
+
+`start-yarn.sh` 一键启动所有的ResourceManager、NodeManager 和 ProxyServer。
+
+`mapred --daemon start historyserver` 启动 JobHistoryServer。
+
+通过如下命令提交一个jar到hadoop集群中：
+```shell
+hadoop jar 程序文件 java类名 [程序参数] ... [程序参数]
+```
 
 
