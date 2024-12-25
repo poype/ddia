@@ -96,5 +96,63 @@ HistoryServer的地址是：`http://node1:18080/`：
 对于Spark StandAlone集群，并没有依赖Yarn，但使用到了HDFS。
 
 
+## Yarn
+确保如下两个环境变量被正确配置到`spark-env.sh`文件中。
+1. HADOOP_CONF_DIR
+2. YARN_CONF_DIR
+
+配置完这两个环境变量后，Spark客户端就能知道Yarn集群的全部信息。
+
+pyspark连接到Yarn集群：
+
+```shell
+./bin/pyspark --master yarn
+
+```
+通过Yarn页面中的 “ApplicationMaster” 链接就能跳转到Spark Driver的WebUI。
+
+<img src="./image3/yarn.png" alt="spark local" style="zoom:50%;" />
+
+提交一个Spark应用到Yarn集群：
+```shell
+./bin/spark-submit --master yarn examples/src/main/python/pi.py 100
+```
+
+如果已经有了Yarn集群，想要在其上运行Spark应用真是非常的简单。只需要随便找一个Yarn集群中的服务器，解压Spark安装包，配置好相应的环境变量，就可以向Yarn集群中提交Spark应用程序了。
+
+
+### client 模式
+```shell
+./bin/spark-submit \
+--master yarn \
+--deploy-mode client \
+--driver-memory 512m \
+--executor-memory 512m \
+--num-executors 3 \
+--total-executor-cores 3 \
+examples/src/main/python/pi.py 100 \
+```
+
+虽然是以client的模式运行，但YARN还是要给ApplicationMaster分配一个container，所以client模式并不能节省Driver需要的资源。
+
+<img src="./image3/yarn_client.png" alt="spark local" style="zoom:20%;" />
+
+client模式最大的好处是可以直接在控制台就能看到日志：
+
+<img src="./image3/client_log.png" alt="spark local" style="zoom:50%;" />
+
+
+### cluster 模式
+
+将deploy-mode从client改成cluster，在terminal中无法查看到结果：
+
+<img src="./image3/cluster_log.png" alt="spark local" style="zoom:50%;" />
+
+结果可以在yarn的日志中找到：
+
+<img src="./image3/yarn_log.png" alt="spark local" style="zoom:50%;" />
+
+cluster 模式更稳定，性能也更好。
+
 
 
