@@ -15,7 +15,7 @@ Flink 能够同时处理有界流（bounded Stream）与无界流（unbounded St
 Flink 中的状态具备以下特点：
 
 - **超大状态（Very Large State）**：Flink 能够维护规模达数 TB 的应用程序状态。
-- **可扩展应用（Scalable Applications）**：Flink 可以将状态重新分配到更多或更少的Worder节点，以此支持有状态应用（Stateful Application）的扩展。
+- **可扩展应用（Scalable Applications）**：Flink 可以将状态重新分配到更多或更少的Worker节点，以此支持有状态应用（Stateful Application）的扩展。
 - **精确一次的状态一致性（Exactly - once state consistency）**：Flink 的检查点（checkpoint）和恢复算法确保在发生故障时，应用程序状态依然保持一致性。
 - **可插拔状态后端（Pluggable State Backends）**：Flink 支持多种不同的状态后端（State Backend），允许将状态存储在内存或 RocksDB 中。
 - **多种状态原语（Multiple State Primitives）**：Flink 针对不同的数据结构，提供了多种状态原语，例如原子值（atomic values）、列表（lists）或映射（maps） 。
